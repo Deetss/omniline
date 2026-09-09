@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260" role="img" aria-label="omniline logo">
+  <title>omniline</title>
+
+  <!-- terminal card -->
+  <rect x="4" y="4" width="472" height="252" rx="28" fill="#14151c" />
+
+  <!-- window dots -->
+  <circle cx="40" cy="38" r="7" fill="#f2545b" opacity="0.9" />
+  <circle cx="64" cy="38" r="7" fill="#f2c94c" opacity="0.9" />
+  <circle cx="88" cy="38" r="7" fill="#58c78a" opacity="0.9" />
+
+  <!-- ring: three sources feeding one line -->
+  <g transform="rotate(-90 240 108)">
+    <circle cx="240" cy="108" r="64" fill="none" stroke="#5b8def"
+            stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="120.04 282.08" stroke-dashoffset="0" />
+    <circle cx="240" cy="108" r="64" fill="none" stroke="#45c4b0"
+            stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="120.04 282.08" stroke-dashoffset="-134.04" />
+    <circle cx="240" cy="108" r="64" fill="none" stroke="#f2a154"
+            stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="120.04 282.08" stroke-dashoffset="-268.08" />
+  </g>
+
+  <!-- connector -->
+  <line x1="240" y1="172" x2="240" y2="196" stroke="#3a3d4d" stroke-width="4" />
+
+  <!-- the one status line -->
+  <rect x="80" y="200" width="320" height="30" rx="15" fill="#1d1f29" stroke="#2b2e3c" stroke-width="2" />
+  <circle cx="106" cy="215" r="6" fill="#5b8def" />
+  <rect x="122" y="211" width="46" height="8" rx="4" fill="#2f3242" />
+  <circle cx="196" cy="215" r="6" fill="#45c4b0" />
+  <rect x="212" y="211" width="70" height="8" rx="4" fill="#2f3242" />
+  <circle cx="310" cy="215" r="6" fill="#f2a154" />
+  <rect x="326" y="211" width="54" height="8" rx="4" fill="#2f3242" />
+</svg>
