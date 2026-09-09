@@ -59,11 +59,27 @@ harness-specific mapping small and honest; everything else lives once.
 
 ## Per-harness support (confirmed, not assumed)
 
-| Harness | Custom command hook? | Status |
+| Harness | Statusline hook | Adapter status |
 |---|---|---|
-| Claude Code | Yes — arbitrary shell command, JSON on stdin | Real, wired-up adapter |
-| antigravity-cli | Yes — same shape as Claude Code (`statusLine.command` in settings.json, or `/statusline <path>`) | Real adapter, built from the documented schema — the CLI wasn't actually installed on the machine this was written on, so verify field names against real output the first time it runs |
-| Codex | **No.** Confirmed against Codex's own source (`codex-rs/tui/src/bottom_pane/status_line_setup.rs`): only a fixed, kebab-case identifier list under `[tui]`/`status_line` in `~/.codex/config.toml`. No way to execute a script. Tracked upstream: [openai/codex#17827](https://github.com/openai/codex/issues/17827) | Not an adapter — `bin/install` writes Codex's native config directly instead |
+| Claude Code | ✅ arbitrary shell command, JSON on stdin | Real, wired up |
+| antigravity-cli | ✅ same shape as Claude Code | Real, unverified against a live install |
+| Codex | ❌ no custom command — fixed field list only | N/A — native config written directly |
+
+**Claude Code** — `statusLine.command` in `settings.json`, JSON payload on
+stdin. Fully wired up.
+
+**antigravity-cli** — same shape as Claude Code (`statusLine.command` in
+`settings.json`, or `/statusline <path>`). The adapter is built from the
+documented schema, but the CLI wasn't actually installed on the machine this
+was written on — verify field names against real output the first time it
+runs.
+
+**Codex** — no way to execute a script. Confirmed against Codex's own source
+(`codex-rs/tui/src/bottom_pane/status_line_setup.rs`): only a fixed,
+kebab-case identifier list under `[tui]`/`status_line` in
+`~/.codex/config.toml`. Tracked upstream:
+[openai/codex#17827](https://github.com/openai/codex/issues/17827). Not an
+adapter — `bin/install` writes that native config directly instead.
 
 ## Layout
 
