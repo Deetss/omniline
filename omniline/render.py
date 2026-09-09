@@ -18,31 +18,27 @@ def make_bar(pct, length=4):
         pct = float(pct)
     except (ValueError, TypeError):
         pct = 0.0
-    filled = min(int(round(pct / 25)), length)
+    filled = min(int(round(pct * length / 100)), length)
     return ("█" * filled) + ("░" * (length - filled))
 
 
-def pct_color(pct):
+def pct_color(pct, warn=50, danger=80):
     try:
         pct = float(pct)
     except (ValueError, TypeError):
         pct = 0.0
-    if pct >= 80:
+    if pct >= danger:
         return RED
-    if pct >= 50:
+    if pct >= warn:
         return YELLOW
     return GREEN
 
 
-def meter(label, pct, color=None):
+def meter(label, pct, color=None, width=4, warn=50, danger=80):
     """A `label` + bar + percentage segment, e.g. `ctx██░░34%`."""
     try:
         pct_val = float(pct)
     except (ValueError, TypeError):
         pct_val = 0.0
-    color = color or pct_color(pct_val)
-    return f"{DIM}{label}{RESET}{color}{make_bar(pct_val)}{RESET}{WHITE}{int(pct_val)}%{RESET}"
-
-
-def join_segments(parts):
-    return f"{DIM} · {RESET}".join(parts)
+    color = color or pct_color(pct_val, warn, danger)
+    return f"{DIM}{label}{RESET}{color}{make_bar(pct_val, width)}{RESET}{WHITE}{int(pct_val)}%{RESET}"
