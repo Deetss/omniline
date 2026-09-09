@@ -20,6 +20,9 @@
   <img alt="omniline statusline output in Claude Code and antigravity-cli" src="assets/screenshot.png">
 </p>
 <p align="center">
+  <img alt="annotated Claude Code statusline: account, path, branch, model, context, rate limits, edgentic tokens, and vim mode each labeled" src="assets/annotated-statusline.png">
+</p>
+<p align="center">
   <img alt="context meter filling and shifting from green to red" src="assets/context-meter.gif" width="220">
 </p>
 
