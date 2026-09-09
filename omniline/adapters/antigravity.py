@@ -1,14 +1,13 @@
 """antigravity-cli's statusline JSON contract, confirmed via
 https://antigravity.google/docs/cli/statusline (fetched 2026-09-09).
 
-antigravity-cli was not actually installed/runnable on the machine this was
-written on -- the CLI binary wasn't on PATH, only a settings.json from an
-earlier, unrelated setup. So this is built from the documented schema, not
-from an observed real payload. In particular `quota` uses dynamic
-"[model/bucket_id]" keys with no example strings given, so the rendering
-below treats every bucket generically rather than assuming names like
-Claude Code's fixed "five_hour"/"seven_day" -- verify the label formatting
-against real output the first time this actually runs.
+Built from the documented schema before a live antigravity-cli was
+available to test against; verified working against a real install and
+real payload on 2026-09-09. `quota` uses dynamic "[model/bucket_id]" keys
+with no example strings in the docs, so the rendering below treats every
+bucket generically rather than assuming names like Claude Code's fixed
+"five_hour"/"seven_day" -- confirmed correct against real bucket ids
+(e.g. 3rd-party and Gemini 5h/weekly windows).
 
 Wired up via antigravity-cli's own settings.json (statusLine.command), set
 either with the `/statusline <path>` slash command inside antigravity-cli or
