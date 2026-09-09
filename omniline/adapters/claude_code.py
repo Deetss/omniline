@@ -13,8 +13,15 @@ Schema (fields this adapter actually reads):
   vim.mode
   session_id
   background_tasks, subagents              (lists; only their length is used)
+
+Segment names (for a ~/.config/omniline/config.json "claude_code" section --
+see omniline/config.py): account, path, model, context, five_hour,
+seven_day, edgentic, vim, background_tasks, subagents. "context" honors
+style overrides label/warn_pct/danger_pct/width; five_hour/seven_day honor
+label only -- their coloring is burn-rate-aware (see pace.py), not a plain
+threshold, so warn_pct/danger_pct don't apply to them.
 """
-from .. import render
+from .. import config, render
 from ..pace import (
     FIVE_HOUR_WINDOW_MIN,
     SEVEN_DAY_WINDOW_MIN,
@@ -26,41 +33,39 @@ from ..pace import (
 from ..sources import clauth, edgentic, git
 from . import base
 
+DEFAULT_ORDER = [
+    "account", "path", "model", "context", "five_hour", "seven_day",
+    "edgentic", "vim", "background_tasks", "subagents",
+]
 
-def _rate_limit_segments(parts, rate_limits, account):
-    five_hour = rate_limits.get("five_hour")
-    if isinstance(five_hour, dict) and five_hour.get("used_percentage") is not None:
-        used = five_hour["used_percentage"]
-        mins_left = mins_until(five_hour.get("resets_at"))
-        color = pace_color(used, mins_left, FIVE_HOUR_WINDOW_MIN)
-        seg = render.meter("5h", used, color)
-        target = pace_target_pct(mins_left, FIVE_HOUR_WINDOW_MIN)
-        if target is not None:
-            seg += f" {color}({target:.1f}%){render.RESET}"
-        seg += format_countdown(mins_left)
-        parts.append(seg)
 
-    seven_day = rate_limits.get("seven_day")
-    if isinstance(seven_day, dict) and seven_day.get("used_percentage") is not None:
-        used = seven_day["used_percentage"]
-        mins_left = mins_until(seven_day.get("resets_at"))
-        color = pace_color(used, mins_left, SEVEN_DAY_WINDOW_MIN)
-        target = pace_target_pct(mins_left, SEVEN_DAY_WINDOW_MIN)
-        seg = render.meter("7d", used, color)
-        if target is not None:
-            seg += f" {color}({target:.1f}%){render.RESET}"
+def _rate_limit_segment(name, default_label, data, window, account, style):
+    if not isinstance(data, dict) or data.get("used_percentage") is None:
+        return ""
+    used = data["used_percentage"]
+    mins_left = mins_until(data.get("resets_at"))
+    color = pace_color(used, mins_left, window)
+    label = config.style_str(style, "label", default_label)
+    seg = render.meter(label, used, color)
+    target = pace_target_pct(mins_left, window)
+    if target is not None:
+        seg += f" {color}({target:.1f}%){render.RESET}"
+    if name == "seven_day":
         # Weekly slice of the seat price the bar maps to. Personal is Pro
         # ($20/mo); work is Max ($200/mo) -- the only two clauth profiles.
         plan_price = 20 if account == "personal" else 200
         weekly_price = plan_price * 12 / 52
         effective = used * weekly_price / 100
         seg += f" {color}${effective:.0f}{render.DIM}/${weekly_price:.0f}{render.RESET}"
-        parts.append(seg)
+    seg += format_countdown(mins_left)
+    return seg
 
 
 def main():
     payload = base.read_payload()
-    parts = []
+    cfg = config.load()
+    section = config.harness_section(cfg, "claude_code")
+    segments = {}
 
     workspace_obj = payload.get("workspace")
     cwd = (
@@ -69,13 +74,13 @@ def main():
         or "."
     )
 
-    # 1. Active account -- lead with it so billing is unmistakable.
+    # Active account -- always available for the "path" segment's own use
+    # below, and rendered as its own segment when there's something to show.
     account = clauth.get_account()
     chip = clauth.render_chip(account)
     if chip:
-        parts.append(chip)
+        segments["account"] = chip
 
-    # 2. Path and branch
     vcs_obj = payload.get("vcs")
     worktree_obj = payload.get("worktree")
     branch = (
@@ -86,43 +91,52 @@ def main():
     loc = f"{render.CYAN}{base.display_dir(cwd)}{render.RESET}"
     if branch:
         loc += f"{render.DIM}:{render.RESET}{render.WHITE}{branch}{render.RESET}"
-    parts.append(loc)
+    segments["path"] = loc
 
-    # 3. Model
     model_obj = payload.get("model")
     if not isinstance(model_obj, dict):
         model_obj = {}
     model_name = model_obj.get("display_name") or model_obj.get("id") or "AGY"
     if " (" in model_name:
         model_name = model_name.split(" (")[0]
-    parts.append(f"{render.BLUE}{model_name}{render.RESET}")
+    segments["model"] = f"{render.BLUE}{model_name}{render.RESET}"
 
-    # 4. Context window
     context_obj = payload.get("context_window")
     if isinstance(context_obj, dict) and context_obj.get("used_percentage") is not None:
-        parts.append(render.meter("ctx", context_obj["used_percentage"]))
+        style = config.segment_style(section, "context")
+        label = config.style_str(style, "label", "ctx")
+        warn = config.style_num(style, "warn_pct", 50)
+        danger = config.style_num(style, "danger_pct", 80)
+        width = config.style_num(style, "width", 4)
+        segments["context"] = render.meter(
+            label, context_obj["used_percentage"], width=width, warn=warn, danger=danger
+        )
 
-    # 5. Rate limits (5h / 7d)
     rate_limits = payload.get("rate_limits")
     if isinstance(rate_limits, dict):
-        _rate_limit_segments(parts, rate_limits, account)
+        segments["five_hour"] = _rate_limit_segment(
+            "five_hour", "5h", rate_limits.get("five_hour"), FIVE_HOUR_WINDOW_MIN,
+            account, config.segment_style(section, "five_hour"),
+        )
+        segments["seven_day"] = _rate_limit_segment(
+            "seven_day", "7d", rate_limits.get("seven_day"), SEVEN_DAY_WINDOW_MIN,
+            account, config.segment_style(section, "seven_day"),
+        )
 
-    # 6. Local tokens (edgentic log)
     chip = edgentic.render_chip(payload)
     if chip:
-        parts.append(chip)
+        segments["edgentic"] = chip
 
-    # 7. Vim mode
     vim_obj = payload.get("vim")
     if isinstance(vim_obj, dict) and vim_obj.get("mode"):
-        parts.append(f"{render.YELLOW}{vim_obj['mode']}{render.RESET}")
+        segments["vim"] = f"{render.YELLOW}{vim_obj['mode']}{render.RESET}"
 
-    # 8. Background tasks & subagents
     bg_tasks = payload.get("background_tasks")
     if isinstance(bg_tasks, list) and bg_tasks:
-        parts.append(f"{render.DIM}bg:{len(bg_tasks)}{render.RESET}")
+        segments["background_tasks"] = f"{render.DIM}bg:{len(bg_tasks)}{render.RESET}"
     subagents = payload.get("subagents")
     if isinstance(subagents, list) and subagents:
-        parts.append(f"{render.DIM}sub:{len(subagents)}{render.RESET}")
+        segments["subagents"] = f"{render.DIM}sub:{len(subagents)}{render.RESET}"
 
-    print(render.join_segments(parts))
+    template = config.resolve_template(section, DEFAULT_ORDER)
+    print(config.render_template(template, segments))

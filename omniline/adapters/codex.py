@@ -14,8 +14,9 @@ crashing, in case Codex ever does add a real hook and someone wires this up
 speculatively.
 
 If Codex ever ships a real hook: read its stdin JSON in main() below, map
-its field names onto omniline.render / .pace / .sources calls the
-same way adapters/claude_code.py does, and print render.join_segments(parts).
+its field names onto omniline.render / .pace / .sources calls into a
+`segments` dict the same way adapters/claude_code.py does, then resolve
+and print a template via omniline.config.
 """
 from . import base
 

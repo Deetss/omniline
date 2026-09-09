@@ -85,6 +85,73 @@ kebab-case identifier list under `[tui]`/`status_line` in
 [openai/codex#17827](https://github.com/openai/codex/issues/17827). Not an
 adapter — `bin/install` writes that native config directly instead.
 
+## Customizing your statusline
+
+Claude Code and antigravity-cli both read an optional config file at
+`$XDG_CONFIG_HOME/omniline/config.json` (falling back to
+`~/.config/omniline/config.json`) that controls which segments show, in
+what order, and how they're styled. No file means the built-in default —
+nothing to set up if you don't want to touch it. (Codex customizes itself,
+via its own native item-order prompt in `bin/install` — see the table
+above.)
+
+The simple path — pick a subset of segments and reorder them:
+
+```json
+{
+  "claude_code": {
+    "segments": ["path", "model", "context", "five_hour"],
+    "separator": " | "
+  }
+}
+```
+
+Any segment name left out just doesn't render — no gaps, no stray
+separators. Each adapter's module docstring
+(`omniline/adapters/claude_code.py`, `omniline/adapters/antigravity.py`)
+lists its available segment names.
+
+The full path — a raw template string, Starship-style, for complete
+control over literal text and separators:
+
+```json
+{
+  "claude_code": {
+    "template": "$model » $context · $five_hour"
+  }
+}
+```
+
+`$name` tokens expand to that segment's rendered value. The literal text
+right before a token is treated as that token's own separator: if the
+segment has nothing to show, both it and the separator before it quietly
+disappear, so a template degrades cleanly instead of leaving a dangling
+" · " when (say) there's no git branch. An unknown token name is just
+empty, never an error.
+
+Per-segment style overrides (currently: `label`, and for plain-percentage
+meters `warn_pct` / `danger_pct` / `width`):
+
+```json
+{
+  "claude_code": {
+    "style": {
+      "context": {"label": "ctx", "warn_pct": 60, "danger_pct": 85, "width": 6}
+    }
+  }
+}
+```
+
+`warn_pct`/`danger_pct` apply to segments colored by a plain percentage
+threshold (`context`, antigravity's `quota`). Claude Code's `five_hour` /
+`seven_day` use burn-rate-aware coloring instead (usage vs. time elapsed
+in the window, see `pace.py`) and only honor a `label` override, not
+`warn_pct`/`danger_pct`.
+
+A config file that's missing, empty, or malformed always falls back to
+the built-in default — a broken `config.json` degrades gracefully instead
+of breaking your prompt on every render.
+
 ## Layout
 
 ```
@@ -92,6 +159,10 @@ omniline/
   render.py        ANSI colors, bar meters, pct->color. Pure functions.
   pace.py           Burn-aware coloring for rate-limit windows (usage vs.
                     time elapsed in the window, not just absolute %).
+  config.py         Optional user config/template loading + $name-token
+                    template rendering. See "Customizing your statusline"
+                    above. Degrades to built-in defaults on any missing
+                    or malformed config -- never crashes a render.
   sources/          Reusable lookups: clauth account, git branch, edgentic
                     local-token log. Any adapter can call these.
   adapters/         One module per harness with a real custom-command hook.
@@ -120,6 +191,9 @@ tests/
   test_installer.py  Exercises install -> backup -> uninstall -> restore
                     for every harness against a fake $HOME. Run with
                     `python3 -m pytest tests/`.
+  test_config.py    Exercises config loading and $name-token template
+                    rendering, including the malformed-config and
+                    empty-segment edge cases.
 ```
 
 ## Uninstall / restore
@@ -144,11 +218,16 @@ matters: Claude Code's and antigravity-cli's config are both literally named
    see `adapters/antigravity.py`'s docstring for what an earlier guess
    (wrong key names, entirely fictional shape) cost this repo once already.
 3. Write `omniline/adapters/<harness>.py`: read the payload with
-   `base.read_payload()`, pull out whatever fields exist, build up a `parts`
-   list using `render.meter()` / `pace.pace_color()` / `sources.*`, print
-   `render.join_segments(parts)`. Only render a segment when the data for it
-   is actually present — a harness that doesn't send rate limits should
-   just not show a rate-limit segment, not crash or show zeros.
+   `base.read_payload()`, pull out whatever fields exist, build up a named
+   `segments` dict using `render.meter()` / `pace.pace_color()` /
+   `sources.*`, then resolve and print a template via
+   `config.resolve_template()` / `config.render_template()` (see
+   `adapters/claude_code.py` for the pattern, and the "Customizing your
+   statusline" section below for what a template is). Only put a key in
+   `segments` when the data for it is actually present — a harness that
+   doesn't send rate limits should just not have a rate-limit segment, not
+   crash or show zeros. Document each segment's name in the adapter's
+   module docstring so users know what they can put in a template.
 4. Add `bin/<harness>-statusline` (copy `bin/claude-statusline`, swap the
    import).
 5. Add status/install/uninstall functions to `installer.py`, using
