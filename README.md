@@ -9,9 +9,18 @@
 <p align="center"><em>One statusline framework. Every AI coding CLI.</em></p>
 
 <p align="center">
+  <img alt="tests" src="https://github.com/Deetss/omniline/actions/workflows/tests.yml/badge.svg">
   <img alt="python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-5b8def">
   <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-none-45c4b0">
   <img alt="install via curl | bash" src="https://img.shields.io/badge/install-curl%20%7C%20bash-f2a154">
+  <a href="LICENSE"><img alt="license MIT" src="https://img.shields.io/badge/license-MIT-8b949e"></a>
+</p>
+
+<p align="center">
+  <img alt="omniline statusline output in Claude Code and antigravity-cli" src="assets/screenshot.png">
+</p>
+<p align="center">
+  <img alt="context meter filling and shifting from green to red" src="assets/context-meter.gif" width="220">
 </p>
 
 A statusline framework for AI coding CLIs: shared rendering + data-lookup
@@ -248,15 +257,10 @@ instead of adding another shim layer — the shim above predates the installer.
 antigravity-cli: `~/.gemini/antigravity-cli/settings.json` → `statusLine.command`
 → `bin/antigravity-statusline` directly.
 
-## Testing
+## Contributing
 
-```bash
-python3 -m pytest tests/
-```
+Adding a new harness adapter and running the test suite are covered in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-To try a single adapter change by hand:
-
-```bash
-echo '{"cwd":"'"$PWD"'","model":{"display_name":"Sonnet 5"},"context_window":{"used_percentage":34}}' \
-  | python3 bin/claude-statusline
-```
+Decisions flagged for the maintainer instead of guessed at live in
+[QUESTIONS.md](QUESTIONS.md).
