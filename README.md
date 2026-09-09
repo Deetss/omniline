@@ -18,6 +18,8 @@ A statusline framework for AI coding CLIs: shared rendering + data-lookup
 primitives, plus one thin adapter per harness that maps that harness's own
 JSON payload onto them — where the harness supports a custom command at all.
 
+Docs site: https://deetss.github.io/omniline/
+
 ## Install
 
 ```bash

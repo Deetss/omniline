@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>omniline &mdash; one statusline framework, every AI coding CLI</title>
+  <meta name="description" content="Install, configure, and uninstall omniline: a shared statusline framework for Claude Code, antigravity-cli, and Codex.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <img class="logo" src="assets/logo-dark.svg" alt="omniline logo" width="72" height="72">
+      <h1>omniline</h1>
+      <p class="tagline">One statusline framework. Every AI coding CLI.</p>
+      <div class="badges">
+        <span class="badge">python 3.8+</span>
+        <span class="badge">dependencies: none</span>
+        <span class="badge">install via curl | bash</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a href="#overview">Overview</a>
+      <a href="#install">Install</a>
+      <a href="#harnesses">Per-harness support</a>
+      <a href="#uninstall-restore">Uninstall / Restore</a>
+      <a href="#customizing">Customizing</a>
+      <a href="#contributing">Contributing</a>
+      <a href="https://github.com/Deetss/omniline">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>
+        omniline is a statusline framework for AI coding CLIs. Most of these
+        tools render a statusline by invoking an external command on every
+        prompt and feeding it a JSON payload on stdin &mdash; but each one
+        shapes that payload differently, even for the same underlying
+        concepts: model name, context usage, rate limits, git branch, and so
+        on.
+      </p>
+      <p>
+        Rather than write a full statusline script per harness, omniline
+        splits the problem in two: a set of shared, pure rendering and
+        data-lookup primitives (ANSI colors, bar meters, rate-limit pacing,
+        source lookups like git branch or account) that every harness reuses,
+        plus one thin adapter per harness that maps its specific JSON shape
+        onto those primitives.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>Why bother splitting it this way?</strong> Duplicating the
+          whole statusline per harness means the copies drift the moment one
+          gets a feature the other doesn't &mdash; which is exactly how this
+          repo started: a Claude-Code-only bash script and a half-finished
+          Python rewrite silently diverged from each other, including a
+          &ldquo;quota&rdquo; schema someone had guessed at and gotten wrong.
+          Adapters keep the harness-specific mapping small and honest;
+          everything else lives once.
+        </p>
+      </div>
+      <p>
+        For the full technical rundown of the module layout and how the
+        pieces fit together, the
+        <a href="https://github.com/Deetss/omniline#readme">README</a>
+        stays the canonical reference. This site is the friendlier walk
+        through installing, understanding, and removing it.
+      </p>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p>The one-liner:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/Deetss/omniline/main/install.sh | bash</code></pre>
+      <p>
+        This downloads omniline into <code>~/.local/share/omniline</code>,
+        then hands off to its interactive installer, which:
+      </p>
+      <ul>
+        <li>detects which of Claude Code / antigravity-cli / Codex are on this machine</li>
+        <li>shows any statusline each one already has configured</li>
+        <li>asks before touching anything, and backs up whatever it's about to overwrite first &mdash; always, never silently</li>
+      </ul>
+      <p>
+        Safe to run again later: it updates the existing copy in place
+        instead of re-cloning, and re-running the installer just re-asks per
+        harness.
+      </p>
+
+      <h3>Flags and environment variables</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Option</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--dir &lt;path&gt;</code></td>
+              <td>Where to install omniline. Defaults to <code>~/.local/share/omniline</code>, or <code>$OMNILINE_HOME</code> if set.</td>
+            </tr>
+            <tr>
+              <td><code>--ref &lt;branch&gt;</code></td>
+              <td>Branch to install. Defaults to <code>main</code>.</td>
+            </tr>
+            <tr>
+              <td><code>$OMNILINE_HOME</code></td>
+              <td>Env var alternative to <code>--dir</code> for the install location.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Pass flags straight to the piped script, for example:</p>
+      <pre><code>curl -fsSL https://raw.githubusercontent.com/Deetss/omniline/main/install.sh | bash -s -- --dir ~/tools/omniline --ref main</code></pre>
+
+      <h3>Prefer to read a script before piping it into bash?</h3>
+      <p>
+        Clone it and run the same installer directly &mdash;
+        <code>install.sh</code> does nothing <code>bin/install</code>
+        doesn't:
+      </p>
+      <pre><code>git clone https://github.com/Deetss/omniline.git
+cd omniline
+python3 bin/install</code></pre>
+
+      <h3>Requirements</h3>
+      <ul>
+        <li><code>python3</code> &ge; 3.8</li>
+        <li>either <code>git</code>, or <code>curl</code> + <code>tar</code> (used as a fallback to download a source archive when <code>git</code> isn't available)</li>
+      </ul>
+      <p>No third-party packages, nothing to compile.</p>
+    </section>
+
+    <section id="harnesses">
+      <h2>Per-harness support</h2>
+      <p>Confirmed against each harness's own docs or source, not assumed.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Harness</th><th>Statusline hook</th><th>Adapter status</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Claude Code</td>
+              <td><span class="dot-green">&#9679;</span> arbitrary shell command, JSON on stdin</td>
+              <td>Real, wired up</td>
+            </tr>
+            <tr>
+              <td>antigravity-cli</td>
+              <td><span class="dot-green">&#9679;</span> same shape as Claude Code</td>
+              <td>Real, verified against a live install</td>
+            </tr>
+            <tr>
+              <td>Codex</td>
+              <td><span class="dot-terracotta">&#9679;</span> no custom command &mdash; fixed field list only</td>
+              <td>N/A &mdash; native config written directly</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Claude Code</h3>
+      <p>
+        Uses <code>statusLine.command</code> in <code>settings.json</code>,
+        with the JSON payload arriving on stdin. Fully wired up.
+      </p>
+
+      <h3>antigravity-cli</h3>
+      <p>
+        Same shape as Claude Code (<code>statusLine.command</code> in
+        <code>settings.json</code>, or <code>/statusline &lt;path&gt;</code>).
+        Originally built from the documented schema alone; now verified
+        against a real install and a real payload, quota bucket rendering
+        included.
+      </p>
+
+      <h3>Codex</h3>
+      <p>
+        Codex has no way to execute a script for its statusline. Confirmed
+        against Codex's own source
+        (<code>codex-rs/tui/src/bottom_pane/status_line_setup.rs</code>):
+        only a fixed, kebab-case identifier list under
+        <code>[tui]</code>/<code>status_line</code> in
+        <code>~/.codex/config.toml</code> is supported. This is tracked
+        upstream as
+        <a href="https://github.com/openai/codex/issues/17827">openai/codex#17827</a>.
+        Because there's no command hook to adapt to, Codex doesn't get an
+        adapter &mdash; <code>bin/install</code> writes that native
+        <code>config.toml</code> block directly instead, including its own
+        item-order customization prompts.
+      </p>
+    </section>
+
+    <section id="uninstall-restore">
+      <h2>Uninstall / Restore</h2>
+      <p>Both are interactive, and both back up current state before changing anything:</p>
+      <pre><code>python3 bin/uninstall   # back up current state, remove this framework's config
+python3 bin/restore     # pick a backup for a harness, back up current state, restore it</code></pre>
+
+      <h3>Backup file naming</h3>
+      <p>Backups are written to:</p>
+      <pre><code>backups/&lt;harness&gt;-&lt;original filename&gt;.&lt;timestamp&gt;.bak</code></pre>
+      <p>
+        This directory is gitignored &mdash; it's machine-local, not
+        something to commit. The harness prefix matters: Claude Code's and
+        antigravity-cli's config files are both literally named
+        <code>settings.json</code>, so without the prefix their backups
+        would be indistinguishable from each other.
+      </p>
+      <p>
+        <code>bin/restore</code> lets you pick which backup to bring back
+        for a given harness, and takes a fresh backup of whatever's
+        currently in place before it restores &mdash; so restoring is never
+        a one-way trip either.
+      </p>
+    </section>
+
+    <section id="customizing">
+      <h2>Customizing your statusline</h2>
+      <div class="callout soon">
+        <p>
+          <strong>Coming soon:</strong> a JSON config for reordering,
+          hiding, and restyling segments per harness. This is being built in
+          a separate, unmerged branch and the design isn't settled yet, so
+          there's nothing to document here.
+        </p>
+      </div>
+    </section>
+
+    <section id="contributing">
+      <h2>Contributing / adding a harness</h2>
+      <p>
+        This site is aimed at people installing, configuring, and
+        uninstalling omniline day to day. If you're looking to add support
+        for a new harness or otherwise contribute code, the README's
+        <a href="https://github.com/Deetss/omniline#adding-a-harness">Adding
+        a harness</a> section walks through the full process: confirming the
+        harness actually supports a custom command, capturing a real payload
+        sample, writing the adapter, and wiring it into the installer and
+        tests.
+      </p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>
+      omniline is open source on
+      <a href="https://github.com/Deetss/omniline">GitHub</a>.
+      The <a href="https://github.com/Deetss/omniline#readme">README</a>
+      is the canonical technical reference.
+    </p>
+  </footer>
+
+</body>
+</html>
