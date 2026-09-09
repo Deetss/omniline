@@ -65,17 +65,16 @@ harness-specific mapping small and honest; everything else lives once.
 | Harness | Statusline hook | Adapter status |
 |---|---|---|
 | Claude Code | ✅ arbitrary shell command, JSON on stdin | Real, wired up |
-| antigravity-cli | ✅ same shape as Claude Code | Real, unverified against a live install |
+| antigravity-cli | ✅ same shape as Claude Code | Real, verified against a live install |
 | Codex | ❌ no custom command — fixed field list only | N/A — native config written directly |
 
 **Claude Code** — `statusLine.command` in `settings.json`, JSON payload on
 stdin. Fully wired up.
 
 **antigravity-cli** — same shape as Claude Code (`statusLine.command` in
-`settings.json`, or `/statusline <path>`). The adapter is built from the
-documented schema, but the CLI wasn't actually installed on the machine this
-was written on — verify field names against real output the first time it
-runs.
+`settings.json`, or `/statusline <path>`). Originally built from the
+documented schema alone; now verified against a real install and real
+payload, quota bucket rendering included.
 
 **Codex** — no way to execute a script. Confirmed against Codex's own source
 (`codex-rs/tui/src/bottom_pane/status_line_setup.rs`): only a fixed,
@@ -95,8 +94,8 @@ omniline/
                     local-token log. Any adapter can call these.
   adapters/         One module per harness with a real custom-command hook.
     claude_code.py  Real, wired-up implementation.
-    antigravity.py  Real implementation, built from documented schema —
-                    not yet verified against a live antigravity-cli.
+    antigravity.py  Real implementation, verified against a live
+                    antigravity-cli install.
     codex.py        Permanent no-op. See table above — there's nothing to
                     wire this to; it exists only so bin/codex-statusline
                     fails safe instead of crashing if ever invoked.
