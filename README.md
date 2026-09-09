@@ -1,8 +1,49 @@
-# omniline
+<p align="center">
+  <img src="assets/logo.svg" alt="omniline" width="360" />
+</p>
+
+<h1 align="center">omniline</h1>
+<p align="center"><em>One statusline framework. Every AI coding CLI.</em></p>
+
+<p align="center">
+  <img alt="python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-5b8def">
+  <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-none-45c4b0">
+  <img alt="install via curl | bash" src="https://img.shields.io/badge/install-curl%20%7C%20bash-f2a154">
+</p>
 
 A statusline framework for AI coding CLIs: shared rendering + data-lookup
 primitives, plus one thin adapter per harness that maps that harness's own
 JSON payload onto them — where the harness supports a custom command at all.
+
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Deetss/omniline/main/install.sh | bash
+```
+
+This downloads omniline into `~/.local/share/omniline` (override with
+`--dir <path>` or the `$OMNILINE_HOME` env var), then hands off to its
+interactive installer, which:
+
+- detects which of Claude Code / antigravity-cli / Codex are on this machine
+- shows any statusline each one already has configured
+- asks before touching anything, and backs up whatever it's about to
+  overwrite first — always, never silently
+
+Safe to run again later: it updates the existing copy in place instead of
+re-cloning, and re-running the installer just re-asks per harness.
+
+Prefer to read a script before piping it into bash? Clone it and run the
+same installer directly — `install.sh` does nothing `bin/install` doesn't:
+
+```bash
+git clone https://github.com/Deetss/omniline.git
+cd omniline
+python3 bin/install
+```
+
+Requires `python3` >= 3.8 and either `git` or `curl`+`tar`. No third-party
+packages, nothing to compile.
 
 ## Why split it this way
 
@@ -44,7 +85,7 @@ omniline/
                     config, backs up before touching anything, then
                     installs / uninstalls / restores per harness. Every
                     path in it goes through home_dir(), which honors
-                    AGY_STATUSLINE_TEST_HOME so tests never touch a real
+                    OMNILINE_TEST_HOME so tests never touch a real
                     config file.
 bin/
   claude-statusline       python3 bin/claude-statusline
@@ -53,24 +94,15 @@ bin/
   install                 Interactive setup: python3 bin/install
   uninstall               Interactive removal: python3 bin/uninstall
   restore                 Interactive restore from a backup: python3 bin/restore
+install.sh              curl | bash bootstrapper — fetches the repo, then
+                        runs bin/install. See Install above.
 tests/
   test_installer.py  Exercises install -> backup -> uninstall -> restore
                     for every harness against a fake $HOME. Run with
                     `python3 -m pytest tests/`.
 ```
 
-## Setup
-
-```bash
-python3 bin/install
-```
-
-Detects which of Claude Code / antigravity-cli / Codex are on this machine
-(by binary on PATH or an existing config file), shows any statusline it's
-already configured with, and asks before touching anything. Any existing
-config gets backed up first — always, never silently overwritten. For Codex
-it writes the native `[tui]` config with a sensible default item order
-instead of pointing at a script (see table above for why).
+## Uninstall / restore
 
 ```bash
 python3 bin/uninstall   # back up current state, remove this framework's config
