@@ -9,9 +9,18 @@
 <p align="center"><em>One statusline framework. Every AI coding CLI.</em></p>
 
 <p align="center">
+  <img alt="tests" src="https://github.com/Deetss/omniline/actions/workflows/tests.yml/badge.svg">
   <img alt="python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-5b8def">
   <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-none-45c4b0">
   <img alt="install via curl | bash" src="https://img.shields.io/badge/install-curl%20%7C%20bash-f2a154">
+  <a href="LICENSE"><img alt="license MIT" src="https://img.shields.io/badge/license-MIT-8b949e"></a>
+</p>
+
+<p align="center">
+  <img alt="omniline statusline output in Claude Code and antigravity-cli" src="assets/screenshot.png">
+</p>
+<p align="center">
+  <img alt="context meter filling and shifting from green to red" src="assets/context-meter.gif" width="220">
 </p>
 
 A statusline framework for AI coding CLIs: shared rendering + data-lookup
@@ -132,30 +141,6 @@ Backups live at `backups/<harness>-<original filename>.<timestamp>.bak`
 matters: Claude Code's and antigravity-cli's config are both literally named
 `settings.json`, so without it their backups would be indistinguishable.
 
-## Adding a harness
-
-1. Confirm the harness actually supports executing a custom command with
-   JSON on stdin — check its own docs/source, don't assume. If it only
-   supports fixed built-in fields (like Codex), it needs `install_*` /
-   `uninstall_*` functions in `installer.py` instead of an adapter.
-2. Capture a real payload sample if you can. Don't guess at field names —
-   see `adapters/antigravity.py`'s docstring for what an earlier guess
-   (wrong key names, entirely fictional shape) cost this repo once already.
-3. Write `omniline/adapters/<harness>.py`: read the payload with
-   `base.read_payload()`, pull out whatever fields exist, build up a `parts`
-   list using `render.meter()` / `pace.pace_color()` / `sources.*`, print
-   `render.join_segments(parts)`. Only render a segment when the data for it
-   is actually present — a harness that doesn't send rate limits should
-   just not show a rate-limit segment, not crash or show zeros.
-4. Add `bin/<harness>-statusline` (copy `bin/claude-statusline`, swap the
-   import).
-5. Add status/install/uninstall functions to `installer.py`, using
-   `home_dir()` for every path (not `os.path.expanduser` directly) so it
-   stays testable, and register it in `COMMAND_HARNESSES` (or alongside
-   Codex's handling in `main()`/`uninstall_main()` if it's a fixed-identifier
-   harness rather than a custom command).
-6. Add its install/uninstall/restore cases to `tests/test_installer.py`.
-
 ## Wiring
 
 Claude Code: `~/.claude/settings.json` → `statusLine.command` →
@@ -167,15 +152,10 @@ instead of adding another shim layer — the shim above predates the installer.
 antigravity-cli: `~/.gemini/antigravity-cli/settings.json` → `statusLine.command`
 → `bin/antigravity-statusline` directly.
 
-## Testing
+## Contributing
 
-```bash
-python3 -m pytest tests/
-```
+Adding a new harness adapter and running the test suite are covered in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-To try a single adapter change by hand:
-
-```bash
-echo '{"cwd":"'"$PWD"'","model":{"display_name":"Sonnet 5"},"context_window":{"used_percentage":34}}' \
-  | python3 bin/claude-statusline
-```
+Decisions flagged for the maintainer instead of guessed at live in
+[QUESTIONS.md](QUESTIONS.md).
