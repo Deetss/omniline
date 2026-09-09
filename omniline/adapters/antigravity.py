@@ -21,14 +21,23 @@ Schema (fields this adapter reads):
   vcs.branch, vcs.dirty                    (falls back to `git` in cwd)
   vim.mode
   session_id
+
+Segment names (for a ~/.config/omniline/config.json "antigravity" section --
+see omniline/config.py): account, path, model, context, quota, edgentic,
+vim. "context" honors style overrides label/warn_pct/danger_pct/width.
+"quota" is a single combined segment (every bucket rendered generically,
+in payload order) since bucket ids are dynamic and can't be named
+individually in a template ahead of time.
 """
 import time
 from datetime import datetime
 
-from .. import render
+from .. import config, render
 from ..pace import format_countdown
 from ..sources import clauth, edgentic, git
 from . import base
+
+DEFAULT_ORDER = ["account", "path", "model", "context", "quota", "edgentic", "vim"]
 
 
 def _mins_until_iso(reset_time):
@@ -39,7 +48,8 @@ def _mins_until_iso(reset_time):
         return None
 
 
-def _quota_segments(parts, quota_obj):
+def _quota_segment(quota_obj):
+    bucket_segs = []
     for bucket_id, data in sorted(quota_obj.items()):
         if not isinstance(data, dict) or data.get("remaining_fraction") is None:
             continue
@@ -55,12 +65,15 @@ def _quota_segments(parts, quota_obj):
 
         seg = render.meter(label, pct)
         seg += format_countdown(mins_left)
-        parts.append(seg)
+        bucket_segs.append(seg)
+    return f"{render.DIM} · {render.RESET}".join(bucket_segs)
 
 
 def main():
     payload = base.read_payload()
-    parts = []
+    cfg = config.load()
+    section = config.harness_section(cfg, "antigravity")
+    segments = {}
 
     workspace_obj = payload.get("workspace")
     cwd = (
@@ -69,13 +82,11 @@ def main():
         or "."
     )
 
-    # 1. Active account -- lead with it so billing is unmistakable.
     account = clauth.get_account()
     chip = clauth.render_chip(account)
     if chip:
-        parts.append(chip)
+        segments["account"] = chip
 
-    # 2. Path, branch, and dirty marker
     vcs_obj = payload.get("vcs")
     branch = None
     dirty = False
@@ -89,33 +100,36 @@ def main():
         loc += f"{render.DIM}:{render.RESET}{render.WHITE}{branch}{render.RESET}"
         if dirty:
             loc += f"{render.YELLOW}*{render.RESET}"
-    parts.append(loc)
+    segments["path"] = loc
 
-    # 3. Model
     model_obj = payload.get("model")
     if not isinstance(model_obj, dict):
         model_obj = {}
     model_name = model_obj.get("display_name") or model_obj.get("id") or "AGY"
-    parts.append(f"{render.BLUE}{model_name}{render.RESET}")
+    segments["model"] = f"{render.BLUE}{model_name}{render.RESET}"
 
-    # 4. Context window
     context_obj = payload.get("context_window")
     if isinstance(context_obj, dict) and context_obj.get("used_percentage") is not None:
-        parts.append(render.meter("ctx", context_obj["used_percentage"]))
+        style = config.segment_style(section, "context")
+        label = config.style_str(style, "label", "ctx")
+        warn = config.style_num(style, "warn_pct", 50)
+        danger = config.style_num(style, "danger_pct", 80)
+        width = config.style_num(style, "width", 4)
+        segments["context"] = render.meter(
+            label, context_obj["used_percentage"], width=width, warn=warn, danger=danger
+        )
 
-    # 5. Quota buckets (dynamic keys, rendered generically)
     quota_obj = payload.get("quota")
     if isinstance(quota_obj, dict):
-        _quota_segments(parts, quota_obj)
+        segments["quota"] = _quota_segment(quota_obj)
 
-    # 6. Local tokens (edgentic log)
     chip = edgentic.render_chip(payload)
     if chip:
-        parts.append(chip)
+        segments["edgentic"] = chip
 
-    # 7. Vim mode
     vim_obj = payload.get("vim")
     if isinstance(vim_obj, dict) and vim_obj.get("mode"):
-        parts.append(f"{render.YELLOW}{vim_obj['mode']}{render.RESET}")
+        segments["vim"] = f"{render.YELLOW}{vim_obj['mode']}{render.RESET}"
 
-    print(render.join_segments(parts))
+    template = config.resolve_template(section, DEFAULT_ORDER)
+    print(config.render_template(template, segments))

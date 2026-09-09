@@ -1,7 +1,9 @@
 """Shared adapter helpers. An adapter's whole job: read stdin JSON, map
-that harness's own field names onto render/pace/sources calls, print
-render.join_segments(parts). Everything schema-specific belongs in the
-adapter module, not here.
+that harness's own field names onto render/pace/sources calls into a
+`segments` dict (name -> rendered string), resolve a template via
+`config.resolve_template()`/`config.render_template()`, and print the
+result. Everything schema-specific belongs in the adapter module, not
+here.
 """
 import json
 import os
