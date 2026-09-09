@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="omniline" width="360" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="omniline" width="96">
+  </picture>
 </p>
 
 <h1 align="center">omniline</h1>
