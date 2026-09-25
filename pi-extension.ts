@@ -11,11 +11,19 @@
  * events, updating a cached line that render() just returns.
  */
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-const STATUSLINE_BIN = fileURLToPath(new URL("./bin/pi-statusline", import.meta.url));
+// Hardcoded, not resolved from import.meta.url: this extension is loaded
+// through a symlink in ~/.pi/agent/extensions/, and Pi's jiti-based loader
+// does not reliably resolve import.meta.url through that symlink back to
+// this file's real location -- a relative path silently pointed at a
+// nonexistent file and failed every refresh with no visible error. This
+// matches the same fixed location every other Herdr-integrated CLI's
+// statusline entrypoint hardcodes (see ~/.claude/statusline-command.sh).
+const STATUSLINE_BIN = join(homedir(), "dev", "tools", "omniline", "bin", "pi-statusline");
 const REFRESH_MS = 2000;
 
 function sessionTokens(ctx: ExtensionContext): { input: number; output: number; cost: number } {
@@ -46,6 +54,7 @@ export default function (pi: ExtensionAPI) {
 		ctx.ui.setFooter((tui, _theme, footerData) => {
 			let cached = ctx.model?.id ?? "pi";
 			let refreshing = false;
+			let consecutiveFailures = 0;
 
 			const refresh = () => {
 				if (refreshing) return;
@@ -60,20 +69,38 @@ export default function (pi: ExtensionAPI) {
 					tokens: sessionTokens(ctx),
 				});
 
-				const child = spawn("python3", [STATUSLINE_BIN], { stdio: ["pipe", "pipe", "ignore"] });
+				const child = spawn("python3", [STATUSLINE_BIN], { stdio: ["pipe", "pipe", "pipe"] });
 				let out = "";
+				let err = "";
 				child.stdout.on("data", (chunk: Buffer) => {
 					out += chunk.toString();
 				});
+				child.stderr.on("data", (chunk: Buffer) => {
+					err += chunk.toString();
+				});
+				const onFailure = (detail: string) => {
+					// A one-shot notify, not a repeat-per-refresh spam: the interval
+					// keeps retrying silently after that in case it's transient, but
+					// the failure is surfaced at least once instead of leaving a
+					// stale placeholder forever with no way to tell it's broken.
+					consecutiveFailures += 1;
+					if (consecutiveFailures === 1) {
+						ctx.ui.notify(`omniline-statusline: ${detail}`, "warning");
+					}
+				};
 				child.on("close", (code) => {
 					refreshing = false;
 					if (code === 0 && out.trim()) {
 						cached = out.trim();
+						consecutiveFailures = 0;
 						tui.requestRender();
+					} else {
+						onFailure(`bin/pi-statusline exited ${code}${err.trim() ? `: ${err.trim()}` : ""}`);
 					}
 				});
-				child.on("error", () => {
+				child.on("error", (spawnErr) => {
 					refreshing = false;
+					onFailure(`failed to spawn python3: ${spawnErr.message}`);
 				});
 				child.stdin.write(payload);
 				child.stdin.end();
