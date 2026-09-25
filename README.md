@@ -81,6 +81,7 @@ harness-specific mapping small and honest; everything else lives once.
 | Claude Code | ✅ arbitrary shell command, JSON on stdin | Real, wired up |
 | antigravity-cli | ✅ same shape as Claude Code | Real, verified against a live install |
 | Codex | ❌ no custom command — fixed field list only | N/A — native config written directly |
+| Pi | ⚠️ in-process extension hook, not a command | Real, adapter invoked by our own extension |
 
 **Claude Code** — `statusLine.command` in `settings.json`, JSON payload on
 stdin. Fully wired up.
@@ -96,6 +97,14 @@ kebab-case identifier list under `[tui]`/`status_line` in
 `~/.codex/config.toml`. Tracked upstream:
 [openai/codex#17827](https://github.com/openai/codex/issues/17827). Not an
 adapter — `bin/install` writes that native config directly instead.
+
+**Pi** — no statusline-command hook either, but for a different reason than
+Codex: its footer is an in-process extension callback (`ctx.ui.setFooter()`),
+not an external command Pi invokes with JSON on stdin. `bin/install`
+symlinks `pi-extension.ts` into `~/.pi/agent/extensions/`; that extension
+gathers what it can see from Pi's own extension API and pipes it to
+`bin/pi-statusline` itself, on the same JSON-on-stdin contract every other
+adapter uses — it's just the extension doing the invoking instead of Pi.
 
 ## Customizing your statusline
 

@@ -365,6 +365,58 @@ def prompt_codex_items() -> list[str]:
     return [i.strip() for i in raw.split(",") if i.strip()]
 
 
+# --- Pi -----------------------------------------------------------------------
+# Pi is neither a command harness (Claude Code, antigravity-cli -- a settings
+# field pointed at a bin/ path) nor a fixed-identifier harness (Codex -- no
+# hook at all). It has a real hook, just an in-process one: an extension can
+# call ctx.ui.setFooter(). So there's no JSON field to write -- instead we
+# symlink pi-extension.ts (this repo) into Pi's user extensions directory;
+# that extension gathers what it can see itself and pipes it to
+# bin/pi-statusline on stdin, same contract as every other adapter, just
+# invoked from the extension instead of by Pi.
+
+def _pi_extension_source() -> str:
+    return os.path.join(REPO_ROOT, "pi-extension.ts")
+
+
+def _pi_extension_target() -> str:
+    return os.path.join(home_dir(), ".pi", "agent", "extensions", "omniline-statusline.ts")
+
+
+def pi_status() -> dict:
+    target = _pi_extension_target()
+    installed = which("pi") or os.path.isdir(os.path.join(home_dir(), ".pi"))
+    existing = None
+    if os.path.islink(target):
+        existing = os.readlink(target)
+    elif os.path.isfile(target):
+        existing = "<file exists, not a symlink -- not ours>"
+    return {"name": "Pi", "installed": installed, "path": target, "existing": existing}
+
+
+def install_pi() -> None:
+    target = _pi_extension_target()
+    source = _pi_extension_source()
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    if os.path.lexists(target):
+        backup = backup_file("pi", target)
+        print(f"  backed up existing extension -> {backup}")
+        os.remove(target)
+    os.symlink(source, target)
+    print(f"  symlinked {target} -> {source}")
+
+
+def uninstall_pi() -> None:
+    target = _pi_extension_target()
+    if not os.path.lexists(target):
+        print("  no omniline-statusline extension found -- nothing to remove.")
+        return
+    backup = backup_file("pi", target)
+    print(f"  backed up current extension -> {backup}")
+    os.remove(target)
+    print("  removed omniline-statusline extension")
+
+
 # --- harness registry, and the three interactive entrypoints ----------------
 
 @dataclass(frozen=True)
@@ -433,6 +485,27 @@ def main() -> None:
             install_codex(prompt_codex_items())
             print()
 
+    # Pi: symlinked extension, not a command-harness settings field.
+    info = pi_status()
+    print(f"== {info['name']} ==")
+    if not info["installed"]:
+        print("  not detected, skipping.\n")
+    else:
+        proceed = True
+        if info["existing"]:
+            already_ours = info["existing"] == _pi_extension_source()
+            if already_ours:
+                print("  already pointed at this framework -- nothing to do.\n")
+                proceed = False
+            else:
+                print(f"  existing extension found: {info['existing']}")
+                proceed = ask_yes_no("  back it up and replace it?", default=False)
+        else:
+            proceed = ask_yes_no("  no omniline-statusline extension yet -- set one up now?", default=True)
+        if proceed:
+            install_pi()
+            print()
+
     print("Done.")
 
 
@@ -469,6 +542,20 @@ def uninstall_main() -> None:
         else:
             print("  skipped.\n")
 
+    info = pi_status()
+    print(f"== {info['name']} ==")
+    if not info["installed"]:
+        print("  not detected, skipping.\n")
+    elif not info["existing"]:
+        print("  no omniline-statusline extension configured -- nothing to remove.\n")
+    else:
+        print(f"  current: {info['existing']}")
+        if ask_yes_no("  back it up and remove it?", default=False):
+            uninstall_pi()
+            print()
+        else:
+            print("  skipped.\n")
+
     print("Done.")
 
 
@@ -476,6 +563,7 @@ _RESTORE_TARGETS = {
     "claude_code": (lambda: claude_code_status()["name"], _claude_settings_path),
     "antigravity": (lambda: antigravity_status()["name"], _antigravity_settings_path),
     "codex": (lambda: codex_status()["name"], _codex_config_path),
+    "pi": (lambda: pi_status()["name"], _pi_extension_target),
 }
 
 
