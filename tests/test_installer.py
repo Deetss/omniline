@@ -201,3 +201,51 @@ def test_codex_install_rejects_unknown_items(fake_home, capsys):
     text = open(config_path).read()
     assert 'status_line = ["current-dir"]' in text
     assert "not-a-real-item" not in text
+
+
+# --- Pi -------------------------------------------------------------------
+
+def test_pi_install_from_nothing(fake_home):
+    target = installer._pi_extension_target()
+    assert not os.path.lexists(target)
+
+    installer.install_pi()
+
+    assert os.path.islink(target)
+    assert os.readlink(target) == installer._pi_extension_source()
+    assert installer.list_backups("pi") == [], "nothing existed, so nothing to back up"
+
+
+def test_pi_install_backup_uninstall_restore_over_existing(fake_home):
+    target = installer._pi_extension_target()
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w") as f:
+        f.write("// some stale hand-written extension\n")
+
+    installer.install_pi()
+
+    assert os.path.islink(target)
+    assert os.readlink(target) == installer._pi_extension_source()
+
+    backups = installer.list_backups("pi")
+    assert len(backups) == 1
+    with open(backups[0]) as f:
+        assert f.read() == "// some stale hand-written extension\n"
+
+    installer.uninstall_pi()
+    assert not os.path.lexists(target)
+
+    backups_after_uninstall = installer.list_backups("pi")
+    assert len(backups_after_uninstall) == 2, "uninstall must also back up what it removes"
+
+    original_backup = sorted(backups_after_uninstall)[0]
+    installer.restore_backup("pi", target, original_backup)
+    with open(target) as f:
+        assert f.read() == "// some stale hand-written extension\n"
+
+
+def test_pi_uninstall_when_nothing_configured(fake_home, capsys):
+    installer.uninstall_pi()
+    out = capsys.readouterr().out
+    assert "nothing to remove" in out
+    assert installer.list_backups("pi") == []
