@@ -26,6 +26,21 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 const STATUSLINE_BIN = join(homedir(), "dev", "tools", "omniline", "bin", "pi-statusline");
 const REFRESH_MS = 2000;
 
+// Format the served (response) model for display: strip a leading
+// "<requested>:" prefix reported by the gateway, and keep only the part after
+// the last "/" for long ids. Returns undefined when there is nothing to show.
+function formatServedModel(responseModel: string, requested: string): string | undefined {
+	let served = responseModel;
+	if (served.startsWith(`${requested}:`)) {
+		served = served.slice(requested.length + 1);
+	}
+	const lastSlash = served.lastIndexOf("/");
+	if (lastSlash >= 0) {
+		served = served.slice(lastSlash + 1);
+	}
+	return served || undefined;
+}
+
 function sessionTokens(ctx: ExtensionContext): { input: number; output: number; cost: number } {
 	let input = 0;
 	let output = 0;
@@ -44,13 +59,28 @@ function sessionTokens(ctx: ExtensionContext): { input: number; output: number; 
 
 export default function (pi: ExtensionAPI) {
 	let triggerRefresh: (() => void) | undefined;
+	let lastResponseModel: string | undefined;
+	let lastModelId: string | undefined;
 
 	pi.on("message_end", (event) => {
 		if (event.message.role !== "assistant") return;
+		if (event.message.responseModel) {
+			lastResponseModel = event.message.responseModel;
+		}
 		triggerRefresh?.();
 	});
 
+	// Reset the tracked served model whenever the user switches models, so a
+	// stale response model from a previous model never leaks into the footer.
+	pi.on("model_select", (_event, ctx) => {
+		lastResponseModel = undefined;
+		lastModelId = ctx.model?.id;
+	});
+
 	pi.on("session_start", (_event, ctx) => {
+		lastResponseModel = undefined;
+		lastModelId = ctx.model?.id;
+
 		ctx.ui.setFooter((tui, _theme, footerData) => {
 			let cached = ctx.model?.id ?? "pi";
 			let refreshing = false;
@@ -60,11 +90,33 @@ export default function (pi: ExtensionAPI) {
 				if (refreshing) return;
 				refreshing = true;
 
+				const modelId = ctx.model?.id;
+				// Reset the tracked served model when the user switches models.
+				if (modelId && lastModelId !== undefined && modelId !== lastModelId) {
+					lastResponseModel = undefined;
+					lastModelId = modelId;
+				} else if (modelId) {
+					lastModelId = modelId;
+				}
+
+				let displayModel: string | null = null;
+				if (modelId) {
+					let served: string | undefined;
+					if (lastResponseModel) {
+						served = formatServedModel(lastResponseModel, modelId);
+					}
+					if (served && served !== modelId) {
+						displayModel = `${modelId} → ${served}`;
+					} else {
+						displayModel = modelId;
+					}
+				}
+
 				const usage = ctx.getContextUsage();
 				const payload = JSON.stringify({
 					cwd: ctx.cwd,
 					branch: footerData.getGitBranch() || null,
-					model: ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : null,
+					model: displayModel != null ? { id: displayModel, provider: ctx.model?.provider } : null,
 					context_window: usage?.percent != null ? { used_percentage: usage.percent } : null,
 					tokens: sessionTokens(ctx),
 				});
